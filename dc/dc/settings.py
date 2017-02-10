@@ -39,6 +39,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
+    'tasks',
 ]
 
 MIDDLEWARE_CLASSES = [
@@ -124,7 +126,7 @@ STATIC_URL = '/static/'
 
 # Rabbit MQ and Celery settings
 
-RABBIT_MQ_USER = "dguest"
+RABBIT_MQ_USER = "guest"
 RABBIT_MQ_PASSWORD = "guest"
 
 BROKER_URL = "amqp://{user}:{password}@172.17.0.4:5672//".format(
@@ -132,11 +134,16 @@ BROKER_URL = "amqp://{user}:{password}@172.17.0.4:5672//".format(
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
+# The backend used to store task results
+# amqp - send results back as AMQP messages
 CELERY_RESULT_BACKEND = 'amqp'
 CELERY_TIMEZONE = TIME_ZONE
+# If set to True, result messages will be persistent.
+# This means the messages will not be lost after a broker restart.
+# The default is for the results to be transient.
 CELERY_RESULT_PERSISTENT = False
 
-EMAIL_QUEUE = 'email_queue'
+WORD_QUEUE = 'word_queue'
 DEFAULT_QUEUE = 'default_queue'
 BEAT_QUEUE = 'beat_queue'
 
@@ -146,25 +153,25 @@ BEAT_EXCHANGE = kombu.Exchange("default_exchange")
 CELERY_QUEUES = (
     kombu.Queue(DEFAULT_QUEUE, DEFAULT_EXCHANGE,
                 routing_key="task.default"),
-    kombu.Queue(EMAIL_QUEUE, DEFAULT_EXCHANGE, routing_key='email_task.send_one_time_email'),
-    kombu.Queue(BEAT_QUEUE, BEAT_EXCHANGE, routing_key='beat_task.send_scheduled_emails'),
+    kombu.Queue(WORD_QUEUE, DEFAULT_EXCHANGE, routing_key='word_task.add_word'),
+    kombu.Queue(BEAT_QUEUE, BEAT_EXCHANGE, routing_key='beat_task.import_words'),
 )
 
 CELERY_ROUTES = {
-    'marketing.tasks.send_one_time_email': {
-        'queue': EMAIL_QUEUE, 'routing_key': 'email_task.send_one_time_email'},
-    'marketing.tasks.send_scheduled_emails': {
-        'queue': BEAT_QUEUE, 'routing_key': 'beat_task.send_scheduled_emails'},
+    'tasks.tasks.add_word': {
+        'queue': WORD_QUEUE, 'routing_key': 'word_task.add_word'},
+    'tasks.tasks.import_words': {
+        'queue': BEAT_QUEUE, 'routing_key': 'beat_task.import_words'},
 }
 
 CELERYBEAT_SCHEDULE = {
-    'send_scheduled_emails': {
-        'task': 'marketing.tasks.send_scheduled_emails',
-        'schedule': schedule(run_every=360),  # time in seconds
+    'import_words': {
+        'task': 'tasks.tasks.import_words',
+        'schedule': schedule(run_every=10),  # time in seconds
         'args': (),
         'options': {'retry': False}
     },
 }
 
-ONE_TIME_EMAIL_SENDING_TIME_LIMIT = 60
-SCHEDULED_EMAILS_SENDING_TIME_LIMIT = 240
+ADD_WORD_TIME_LIMIT = 60
+IMPORT_WORDS_TIME_LIMIT = 240

@@ -48,14 +48,14 @@ RabbitMQ cli management
 
 Run celery workers
 ------------------
-    $ celery -A tpi worker -l info -n worker.email -Q email_queue
-    $ celery -A tpi worker -l info --beat -n worker.beat -Q beat_queue --concurrency=1
+    $ celery -A dc worker -l info -n worker.word -Q word_queue
+    $ celery -A dc worker -l info --beat -n worker.beat -Q beat_queue --concurrency=1
 
 List active celery nodes
 ---------------------------------------
-    $ celery -A tpi status
+    $ celery -A dc status
 
 Inspect celery task
 -------------------
-     $ celery -A tpi inspect active
-     $ celery -A tpi inspect scheduled
+     $ celery -A dc inspect active
+     $ celery -A dc inspect scheduled
