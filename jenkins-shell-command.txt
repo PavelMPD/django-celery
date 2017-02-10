@@ -1,0 +1,38 @@
+# 1 command
+echo "Preparing environment"
+ENV_NAME=dev
+echo "Rename RabbitMQ queue names in settings.py"
+word_queue_replace_expression=$(printf "s/WORD_QUEUE = 'word_queue'/WORD_QUEUE = 'word_queue_$ENV_NAME'/g" )
+beat_queue_replace_expression=$(printf "s/BEAT_QUEUE = 'beat_queue'/BEAT_QUEUE = 'beat_queue_$ENV_NAME'/g" )
+word_exchange_replace_expression=$(printf "s/kombu.Exchange(\"default_exchange\")/kombu.Exchange("\'default_exchange_$ENV_NAME\'")/g" )
+beat_exchange_replace_expression=$(printf "s/kombu.Exchange(\"beat_exchange\")/kombu.Exchange("\'beat_exchange_$ENV_NAME\'")/g" )
+sed -i "$word_queue_replace_expression" ./dc/settings.py
+sed -i "$beat_queue_replace_expression" ./dc/settings.py
+sed -i "$word_exchange_replace_expression" ./dc/settings.py
+sed -i "$beat_exchange_replace_expression" ./dc/settings.py
+
+# 2 command
+echo "Running celery tasks"
+ENV_NAME=dev
+word_queue="word_queue_$ENV_NAME"
+beat_queue="beat_queue_$ENV_NAME"
+
+
+LOG_FOLDER="$(pwd)/logs";
+
+if ! [ -d "$LOG_FOLDER" ]; then
+  mkdir "$LOG_FOLDER"
+fi
+
+. ./.venv/bin/activate
+
+echo "Removing of existing workers"
+
+ps aux | grep "worker.beat_$ENV_NAME\|worker.word_$ENV_NAME" | awk '{print $2}' | sudo xargs kill -9 || true
+
+echo "Start of new workers"
+
+sudo daemonize -E PYTHONPATH="$(pwd)" -e "$LOG_FOLDER/$beat_queue.log" "$(pwd)/.venv/bin/celery" -A dc worker -l info --beat -n "worker.beat_$ENV_NAME" -Q "$beat_queue" --concurrency=1
+sudo daemonize -E PYTHONPATH="$(pwd)" -e "$LOG_FOLDER/$word_queue.log" "$(pwd)/.venv/bin/celery" -A dc worker -l info -n "worker.word_$ENV_NAME" -Q "$word_queue"
+
+deactivate
